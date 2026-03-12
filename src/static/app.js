@@ -580,6 +580,9 @@ document.addEventListener("DOMContentLoaded", () => {
         </ul>
       </div>
       <div class="activity-card-actions">
+        <button class="share-button" data-activity="${name}">
+          📤 Share
+        </button>
         ${
           currentUser
             ? `
@@ -613,6 +616,12 @@ document.addEventListener("DOMContentLoaded", () => {
         });
       }
     }
+
+    // Add click handler for share button
+    const shareButton = activityCard.querySelector(".share-button");
+    shareButton.addEventListener("click", () => {
+      shareActivity(name, details);
+    });
 
     activitiesList.appendChild(activityCard);
   }
@@ -824,6 +833,89 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
     );
+  }
+
+  // Share activity using Web Share API or fallback modal
+  async function shareActivity(name, details) {
+    const shareText = `Check out "${name}" at Mergington High School! ${details.description}`;
+    const shareUrl = window.location.href;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: name, text: shareText, url: shareUrl });
+      } catch (err) {
+        if (err.name !== "AbortError") {
+          showShareModal(name, shareText, shareUrl);
+        }
+      }
+    } else {
+      showShareModal(name, shareText, shareUrl);
+    }
+  }
+
+  // Show sharing options modal (fallback for browsers without Web Share API)
+  function showShareModal(name, shareText, shareUrl) {
+    let shareModal = document.getElementById("share-modal");
+    if (!shareModal) {
+      shareModal = document.createElement("div");
+      shareModal.id = "share-modal";
+      shareModal.className = "modal hidden";
+      shareModal.innerHTML = `
+        <div class="modal-content share-modal-content">
+          <span class="close-share-modal">&times;</span>
+          <h3>Share <span id="share-activity-name"></span></h3>
+          <div class="share-buttons">
+            <a id="share-twitter" class="share-btn share-twitter" target="_blank" rel="noopener noreferrer">𝕏 X (Twitter)</a>
+            <a id="share-facebook" class="share-btn share-facebook" target="_blank" rel="noopener noreferrer">📘 Facebook</a>
+            <a id="share-whatsapp" class="share-btn share-whatsapp" target="_blank" rel="noopener noreferrer">💬 WhatsApp</a>
+            <button id="share-copy" class="share-btn share-copy">🔗 Copy Link</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(shareModal);
+
+      shareModal.querySelector(".close-share-modal").addEventListener("click", closeShareModal);
+      shareModal.addEventListener("click", (event) => {
+        if (event.target === shareModal) closeShareModal();
+      });
+    }
+
+    document.getElementById("share-activity-name").textContent = name;
+
+    const encodedText = encodeURIComponent(shareText);
+    const encodedUrl = encodeURIComponent(shareUrl);
+
+    shareModal.querySelector("#share-twitter").href =
+      `https://x.com/intent/tweet?text=${encodedText}&url=${encodedUrl}`;
+    shareModal.querySelector("#share-facebook").href =
+      `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`;
+    shareModal.querySelector("#share-whatsapp").href =
+      `https://api.whatsapp.com/send?text=${encodedText}%20${encodedUrl}`;
+
+    // Replace copy button to reset its listener for the current URL
+    const oldCopyBtn = shareModal.querySelector("#share-copy");
+    const newCopyBtn = oldCopyBtn.cloneNode(true);
+    oldCopyBtn.parentNode.replaceChild(newCopyBtn, oldCopyBtn);
+    newCopyBtn.addEventListener("click", () => {
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        showMessage("Link copied to clipboard!", "success");
+        closeShareModal();
+      }).catch(() => {
+        showMessage("Could not copy link. Please copy it manually from the address bar.", "error");
+      });
+    });
+
+    shareModal.classList.remove("hidden");
+    setTimeout(() => shareModal.classList.add("show"), 10);
+  }
+
+  // Close share modal
+  function closeShareModal() {
+    const shareModal = document.getElementById("share-modal");
+    if (shareModal) {
+      shareModal.classList.remove("show");
+      setTimeout(() => shareModal.classList.add("hidden"), 300);
+    }
   }
 
   // Show message function
